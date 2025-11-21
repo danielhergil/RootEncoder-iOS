@@ -81,7 +81,21 @@ public class MetalStreamInterface: MetalInterface {
     public func setOrientation(orientation: Int) {
         self.rotation = orientation
     }
-    
+
+    /// Lock orientation to prevent processing device orientation changes
+    public func lockOrientation() {
+        sensorManager.stop()
+    }
+
+    /// Unlock orientation to allow processing device orientation changes
+    public func unlockOrientation() {
+        sensorManager.start(callback: { orientation in
+            self.rotated = ((self.rotation == 0 || self.rotation == 180) && (orientation == 90 || orientation == 270)) ||
+            ((self.rotation == 90 || self.rotation == 270) && (orientation == 0 || orientation == 180))
+            self.rotation = orientation
+        })
+    }
+
     public func setCallback(callback: MetalViewCallback?) {
         self.callback = callback
     }

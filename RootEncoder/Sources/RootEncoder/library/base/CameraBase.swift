@@ -207,7 +207,210 @@ public class CameraBase {
     public func getCameraManager() -> CameraManager {
         cameraManager
     }
-    
+
+    // MARK: - Manual Camera Controls
+
+    // MARK: ISO Control
+
+    /// Set manual ISO value
+    /// - Parameter iso: ISO value (will be clamped to device range)
+    /// - Returns: true if successful, false if not supported or device unavailable
+    public func setManualISO(_ iso: Float) -> Bool {
+        return cameraManager.setManualISO(iso)
+    }
+
+    /// Get current ISO value
+    /// - Returns: Current ISO value
+    public func getISO() -> Float {
+        return cameraManager.getISO()
+    }
+
+    /// Get minimum supported ISO value
+    /// - Returns: Minimum ISO value
+    public func getMinISO() -> Float {
+        return cameraManager.getMinISO()
+    }
+
+    /// Get maximum supported ISO value
+    /// - Returns: Maximum ISO value
+    public func getMaxISO() -> Float {
+        return cameraManager.getMaxISO()
+    }
+
+    /// Enable automatic ISO
+    /// - Returns: true if successful, false if not supported
+    public func enableAutoISO() -> Bool {
+        return cameraManager.enableAutoISO()
+    }
+
+    /// Check if ISO is in automatic mode
+    /// - Returns: true if auto ISO is enabled
+    public func isAutoISO() -> Bool {
+        return cameraManager.isAutoISO()
+    }
+
+    // MARK: Exposure Time Control
+
+    /// Set manual exposure time
+    /// - Parameter duration: Exposure duration as CMTime (will be clamped to device range)
+    /// - Returns: true if successful, false if not supported
+    public func setManualExposureTime(_ duration: CMTime) -> Bool {
+        return cameraManager.setManualExposureTime(duration)
+    }
+
+    /// Set manual exposure time using shutter speed notation (e.g., 1/60, 1/125)
+    /// - Parameters:
+    ///   - numerator: Numerator of the fraction (usually 1)
+    ///   - denominator: Denominator of the fraction (e.g., 60 for 1/60 second)
+    /// - Returns: true if successful, false if not supported
+    public func setManualExposureTimeShutter(numerator: Int32, denominator: Int32) -> Bool {
+        return cameraManager.setManualExposureTimeShutter(numerator: numerator, denominator: denominator)
+    }
+
+    /// Get current exposure time
+    /// - Returns: Current exposure duration as CMTime
+    public func getExposureTime() -> CMTime {
+        return cameraManager.getExposureTime()
+    }
+
+    /// Get current exposure time in seconds
+    /// - Returns: Current exposure duration in seconds
+    public func getExposureTimeSeconds() -> Double {
+        return cameraManager.getExposureTimeSeconds()
+    }
+
+    /// Get minimum supported exposure time
+    /// - Returns: Minimum exposure duration as CMTime
+    public func getMinExposureTime() -> CMTime {
+        return cameraManager.getMinExposureTime()
+    }
+
+    /// Get maximum supported exposure time
+    /// - Returns: Maximum exposure duration as CMTime
+    public func getMaxExposureTime() -> CMTime {
+        return cameraManager.getMaxExposureTime()
+    }
+
+    // MARK: White Balance Control
+
+    /// Set white balance by color temperature in Kelvin
+    /// - Parameter kelvin: Color temperature in Kelvin (typically 2000-8000K, will be clamped)
+    /// - Returns: true if successful, false if not supported
+    public func setWhiteBalanceTemperature(_ kelvin: Float) -> Bool {
+        return cameraManager.setWhiteBalanceTemperature(kelvin)
+    }
+
+    /// Set white balance using RGB gains
+    /// - Parameters:
+    ///   - redGain: Red channel gain (1.0 = neutral)
+    ///   - greenGain: Green channel gain (1.0 = neutral)
+    ///   - blueGain: Blue channel gain (1.0 = neutral)
+    /// - Returns: true if successful, false if not supported
+    public func setWhiteBalanceGains(redGain: Float, greenGain: Float, blueGain: Float) -> Bool {
+        return cameraManager.setWhiteBalanceGains(redGain: redGain, greenGain: greenGain, blueGain: blueGain)
+    }
+
+    /// Enable automatic white balance
+    /// - Returns: true if successful, false if not supported
+    public func enableAutoWhiteBalance() -> Bool {
+        return cameraManager.enableAutoWhiteBalance()
+    }
+
+    /// Check if white balance is in automatic mode
+    /// - Returns: true if auto white balance is enabled
+    public func isAutoWhiteBalance() -> Bool {
+        return cameraManager.isAutoWhiteBalance()
+    }
+
+    /// Get current white balance gains
+    /// - Returns: Current white balance gains (red, green, blue)
+    public func getWhiteBalanceGains() -> AVCaptureDevice.WhiteBalanceGains {
+        return cameraManager.getWhiteBalanceGains()
+    }
+
+    /// Get current white balance as color temperature in Kelvin
+    /// - Returns: Color temperature in Kelvin
+    public func getWhiteBalanceTemperature() -> Float {
+        return cameraManager.getWhiteBalanceTemperature()
+    }
+
+    /// Get maximum allowed white balance gain
+    /// - Returns: Maximum gain value
+    public func getMaxWhiteBalanceGain() -> Float {
+        return cameraManager.getMaxWhiteBalanceGain()
+    }
+
+    // MARK: Exposure Compensation Control
+
+    /// Set exposure compensation (EV)
+    /// - Parameter ev: Exposure compensation in EV units (will be clamped to device range)
+    /// - Returns: true if successful, false if device unavailable
+    public func setExposureCompensation(_ ev: Float) -> Bool {
+        return cameraManager.setExposureCompensation(ev)
+    }
+
+    /// Get current exposure compensation value
+    /// - Returns: Current exposure compensation in EV units
+    public func getExposureCompensation() -> Float {
+        return cameraManager.getExposureCompensation()
+    }
+
+    /// Get minimum supported exposure compensation
+    /// - Returns: Minimum EV value
+    public func getMinExposureCompensation() -> Float {
+        return cameraManager.getMinExposureCompensation()
+    }
+
+    /// Get maximum supported exposure compensation
+    /// - Returns: Maximum EV value
+    public func getMaxExposureCompensation() -> Float {
+        return cameraManager.getMaxExposureCompensation()
+    }
+
+    /// Reset exposure compensation to 0 EV
+    /// - Returns: true if successful
+    public func resetExposureCompensation() -> Bool {
+        return cameraManager.resetExposureCompensation()
+    }
+
+    // MARK: Focus Distance Control
+
+    /// Set manual focus distance
+    /// - Parameter lensPosition: Focus distance (0.0 = infinity, 1.0 = minimum focus distance)
+    /// - Returns: true if successful, false if not supported
+    public func setManualFocus(_ lensPosition: Float) -> Bool {
+        return cameraManager.setManualFocus(lensPosition)
+    }
+
+    /// Enable automatic focus
+    /// - Returns: true if successful, false if not supported
+    public func enableAutoFocus() -> Bool {
+        return cameraManager.enableAutoFocus()
+    }
+
+    /// Check if focus is in automatic mode
+    /// - Returns: true if auto focus is enabled
+    public func isAutoFocus() -> Bool {
+        return cameraManager.isAutoFocus()
+    }
+
+    /// Get current lens position (focus distance)
+    /// - Returns: Current lens position (0.0 = infinity, 1.0 = minimum focus distance)
+    public func getLensPosition() -> Float {
+        return cameraManager.getLensPosition()
+    }
+
+    /// Lock camera orientation to prevent video rotation when device rotates
+    /// This prevents blinking and rotation when device moves
+    public func lockOrientation() {
+        metalInterface.lockOrientation()
+    }
+
+    /// Unlock camera orientation to allow video rotation when device rotates
+    public func unlockOrientation() {
+        metalInterface.unlockOrientation()
+    }
+
     public func replaceMetalInterface() {
         self.metalInterface.setCallback(callback: nil)
         let metalStreamInterface = MetalStreamInterface()

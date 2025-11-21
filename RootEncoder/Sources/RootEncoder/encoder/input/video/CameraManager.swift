@@ -152,6 +152,13 @@ public class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     public func getResolutionsByFace(facing: CameraHelper.Facing) -> [CMVideoDimensions] {
         let position = facing == CameraHelper.Facing.BACK ? AVCaptureDevice.Position.back : AVCaptureDevice.Position.front
         let devices = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: position)
+
+        // Check if devices array is empty (simulator case)
+        guard !devices.devices.isEmpty else {
+            print("Warning: No camera devices found (running in simulator?)")
+            return []
+        }
+
         let device = devices.devices[0]
         let descriptions = device.formats.map(\.formatDescription)
         let sizes = descriptions.map(\.dimensions)
@@ -191,6 +198,13 @@ public class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
         session?.sessionPreset = self.resolution.preset
         let position = facing == CameraHelper.Facing.BACK ? AVCaptureDevice.Position.back : AVCaptureDevice.Position.front
         let devices = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: position)
+
+        // Check if devices array is empty (simulator case)
+        guard !devices.devices.isEmpty else {
+            print("Error: Cannot start camera - no devices found (running in simulator?)")
+            return
+        }
+
         device = devices.devices[0]
 
         do{
@@ -265,4 +279,389 @@ public class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     public func getCaptureSession() -> AVCaptureSession? {
         session
     }
+
+    // MARK: - Manual ISO Control
+
+    /// Set manual ISO value
+    /// - Parameter iso: ISO value to set (will be clamped to device range)
+    /// - Returns: true if successful, false otherwise
+    public func setManualISO(_ iso: Float) -> Bool {
+        guard let device else { return false }
+        guard device.isExposureModeSupported(.custom) else {
+            print("Manual ISO not supported on this device")
+            return false
+        }
+
+        let minISO = device.activeFormat.minISO
+        let maxISO = device.activeFormat.maxISO
+        let clampedISO = min(max(iso, minISO), maxISO)
+
+        do {
+            try device.lockForConfiguration()
+            // Keep current exposure duration, only change ISO
+            device.setExposureModeCustom(
+                duration: device.exposureDuration,
+                iso: clampedISO
+            ) { (time) in
+                print("Manual ISO \(clampedISO) applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting manual ISO: \(error)")
+            return false
+        }
+    }
+
+    /// Get current ISO value
+    /// - Returns: Current ISO value
+    public func getISO() -> Float {
+        guard let device else { return 0 }
+        return device.iso
+    }
+
+    /// Get minimum supported ISO value
+    /// - Returns: Minimum ISO value
+    public func getMinISO() -> Float {
+        guard let device else { return 0 }
+        return device.activeFormat.minISO
+    }
+
+    /// Get maximum supported ISO value
+    /// - Returns: Maximum ISO value
+    public func getMaxISO() -> Float {
+        guard let device else { return 0 }
+        return device.activeFormat.maxISO
+    }
+
+    /// Enable automatic ISO (auto exposure)
+    /// - Returns: true if successful, false otherwise
+    public func enableAutoISO() -> Bool {
+        guard let device else { return false }
+        guard device.isExposureModeSupported(.continuousAutoExposure) else { return false }
+
+        do {
+            try device.lockForConfiguration()
+            device.exposureMode = .continuousAutoExposure
+            device.unlockForConfiguration()
+            print("Auto ISO enabled")
+            return true
+        } catch {
+            print("Error enabling auto ISO: \(error)")
+            return false
+        }
+    }
+
+    /// Check if auto ISO is currently enabled
+    /// - Returns: true if auto exposure is enabled
+    public func isAutoISO() -> Bool {
+        guard let device else { return false }
+        return device.exposureMode == .continuousAutoExposure || device.exposureMode == .autoExpose
+    }
+
+    // MARK: - Manual Exposure Time Control
+
+    /// Set manual exposure time (shutter speed)
+    /// - Parameter duration: Exposure duration as CMTime
+    /// - Returns: true if successful, false otherwise
+    public func setManualExposureTime(_ duration: CMTime) -> Bool {
+        guard let device else { return false }
+        guard device.isExposureModeSupported(.custom) else {
+            print("Manual exposure time not supported on this device")
+            return false
+        }
+
+        let minDuration = device.activeFormat.minExposureDuration
+        let maxDuration = device.activeFormat.maxExposureDuration
+        let clampedDuration = CMTimeClamp(duration, min: minDuration, max: maxDuration)
+
+        do {
+            try device.lockForConfiguration()
+            // Keep current ISO, only change exposure time
+            device.setExposureModeCustom(
+                duration: clampedDuration,
+                iso: device.iso
+            ) { (time) in
+                print("Manual exposure time applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting manual exposure time: \(error)")
+            return false
+        }
+    }
+
+    /// Set manual exposure time using shutter speed fraction (e.g., 1/30 for 30fps)
+    /// - Parameters:
+    ///   - numerator: Numerator of the fraction (typically 1)
+    ///   - denominator: Denominator of the fraction (e.g., 30 for 1/30s)
+    /// - Returns: true if successful, false otherwise
+    public func setManualExposureTimeShutter(numerator: Int64, denominator: Int32) -> Bool {
+        let duration = CMTimeMake(value: numerator, timescale: denominator)
+        return setManualExposureTime(duration)
+    }
+
+    /// Get current exposure time
+    /// - Returns: Current exposure duration as CMTime
+    public func getExposureTime() -> CMTime {
+        guard let device else { return .zero }
+        return device.exposureDuration
+    }
+
+    /// Get current exposure time as seconds
+    /// - Returns: Exposure time in seconds
+    public func getExposureTimeSeconds() -> Double {
+        let time = getExposureTime()
+        return CMTimeGetSeconds(time)
+    }
+
+    /// Get minimum supported exposure time
+    /// - Returns: Minimum exposure duration
+    public func getMinExposureTime() -> CMTime {
+        guard let device else { return .zero }
+        return device.activeFormat.minExposureDuration
+    }
+
+    /// Get maximum supported exposure time
+    /// - Returns: Maximum exposure duration
+    public func getMaxExposureTime() -> CMTime {
+        guard let device else { return .zero }
+        return device.activeFormat.maxExposureDuration
+    }
+
+    // MARK: - White Balance Control
+
+    /// Set white balance using temperature in Kelvin
+    /// - Parameter kelvin: Color temperature (2000K - 8000K typical)
+    /// - Returns: true if successful, false otherwise
+    public func setWhiteBalanceTemperature(_ kelvin: Float) -> Bool {
+        guard let device else { return false }
+        guard device.isWhiteBalanceModeSupported(.locked) else {
+            print("Manual white balance not supported on this device")
+            return false
+        }
+
+        let temperatureAndTint = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(
+            temperature: kelvin,
+            tint: 0
+        )
+
+        // Convert temperature to RGB gains
+        var gains = device.deviceWhiteBalanceGains(for: temperatureAndTint)
+
+        // Clamp to device limits
+        let maxGain = device.maxWhiteBalanceGain
+        gains.redGain = min(max(gains.redGain, 1.0), maxGain)
+        gains.greenGain = min(max(gains.greenGain, 1.0), maxGain)
+        gains.blueGain = min(max(gains.blueGain, 1.0), maxGain)
+
+        do {
+            try device.lockForConfiguration()
+            device.setWhiteBalanceModeLocked(with: gains) { (time) in
+                print("White balance temperature \(kelvin)K applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting white balance temperature: \(error)")
+            return false
+        }
+    }
+
+    /// Set white balance using RGB gains directly
+    /// - Parameters:
+    ///   - redGain: Red channel gain
+    ///   - greenGain: Green channel gain
+    ///   - blueGain: Blue channel gain
+    /// - Returns: true if successful, false otherwise
+    public func setWhiteBalanceGains(redGain: Float, greenGain: Float, blueGain: Float) -> Bool {
+        guard let device else { return false }
+        guard device.isWhiteBalanceModeSupported(.locked) else {
+            print("Manual white balance not supported on this device")
+            return false
+        }
+
+        // Clamp to device limits
+        let maxGain = device.maxWhiteBalanceGain
+        let gains = AVCaptureDevice.WhiteBalanceGains(
+            redGain: min(max(redGain, 1.0), maxGain),
+            greenGain: min(max(greenGain, 1.0), maxGain),
+            blueGain: min(max(blueGain, 1.0), maxGain)
+        )
+
+        do {
+            try device.lockForConfiguration()
+            device.setWhiteBalanceModeLocked(with: gains) { (time) in
+                print("White balance gains applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting white balance gains: \(error)")
+            return false
+        }
+    }
+
+    /// Enable automatic white balance
+    /// - Returns: true if successful, false otherwise
+    public func enableAutoWhiteBalance() -> Bool {
+        guard let device else { return false }
+        guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else { return false }
+
+        do {
+            try device.lockForConfiguration()
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
+            device.unlockForConfiguration()
+            print("Auto white balance enabled")
+            return true
+        } catch {
+            print("Error enabling auto white balance: \(error)")
+            return false
+        }
+    }
+
+    /// Check if auto white balance is currently enabled
+    /// - Returns: true if auto white balance is enabled
+    public func isAutoWhiteBalance() -> Bool {
+        guard let device else { return false }
+        return device.whiteBalanceMode == .continuousAutoWhiteBalance
+    }
+
+    /// Get current white balance gains
+    /// - Returns: Current white balance gains
+    public func getWhiteBalanceGains() -> AVCaptureDevice.WhiteBalanceGains {
+        guard let device else {
+            return AVCaptureDevice.WhiteBalanceGains(redGain: 1.0, greenGain: 1.0, blueGain: 1.0)
+        }
+        return device.deviceWhiteBalanceGains
+    }
+
+    /// Get current white balance temperature
+    /// - Returns: Current temperature in Kelvin
+    public func getWhiteBalanceTemperature() -> Float {
+        guard let device else { return 0 }
+        let gains = device.deviceWhiteBalanceGains
+        let temperatureAndTint = device.temperatureAndTintValues(for: gains)
+        return temperatureAndTint.temperature
+    }
+
+    /// Get maximum white balance gain supported by device
+    /// - Returns: Maximum gain value
+    public func getMaxWhiteBalanceGain() -> Float {
+        guard let device else { return 0 }
+        return device.maxWhiteBalanceGain
+    }
+
+    // MARK: - Exposure Compensation Control
+
+    /// Set exposure compensation (EV adjustment)
+    /// - Parameter ev: Exposure value adjustment (typically -8.0 to +8.0)
+    /// - Returns: true if successful, false otherwise
+    public func setExposureCompensation(_ ev: Float) -> Bool {
+        guard let device else { return false }
+
+        let minEV = device.minExposureTargetBias
+        let maxEV = device.maxExposureTargetBias
+        let clampedEV = min(max(ev, minEV), maxEV)
+
+        do {
+            try device.lockForConfiguration()
+            device.setExposureTargetBias(clampedEV) { (time) in
+                print("Exposure compensation \(clampedEV) EV applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting exposure compensation: \(error)")
+            return false
+        }
+    }
+
+    /// Get current exposure compensation value
+    /// - Returns: Current EV compensation
+    public func getExposureCompensation() -> Float {
+        guard let device else { return 0 }
+        return device.exposureTargetBias
+    }
+
+    /// Get minimum exposure compensation supported
+    /// - Returns: Minimum EV value
+    public func getMinExposureCompensation() -> Float {
+        guard let device else { return 0 }
+        return device.minExposureTargetBias
+    }
+
+    /// Get maximum exposure compensation supported
+    /// - Returns: Maximum EV value
+    public func getMaxExposureCompensation() -> Float {
+        guard let device else { return 0 }
+        return device.maxExposureTargetBias
+    }
+
+    /// Reset exposure compensation to 0
+    /// - Returns: true if successful
+    public func resetExposureCompensation() -> Bool {
+        return setExposureCompensation(0.0)
+    }
+
+    // MARK: - Focus Distance Control
+
+    /// Set manual focus distance
+    /// - Parameter lensPosition: Focus position (0.0 = infinity, 1.0 = closest)
+    /// - Returns: true if successful, false otherwise
+    public func setManualFocus(_ lensPosition: Float) -> Bool {
+        guard let device else { return false }
+        guard device.isFocusModeSupported(.locked) else {
+            print("Manual focus not supported on this device")
+            return false
+        }
+
+        let clampedPosition = min(max(lensPosition, 0.0), 1.0)
+
+        do {
+            try device.lockForConfiguration()
+            device.setFocusModeLocked(lensPosition: clampedPosition) { (time) in
+                print("Manual focus position \(clampedPosition) applied at time: \(time)")
+            }
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("Error setting manual focus: \(error)")
+            return false
+        }
+    }
+
+    /// Enable automatic focus
+    /// - Returns: true if successful, false otherwise
+    public func enableAutoFocus() -> Bool {
+        guard let device else { return false }
+        guard device.isFocusModeSupported(.continuousAutoFocus) else { return false }
+
+        do {
+            try device.lockForConfiguration()
+            device.focusMode = .continuousAutoFocus
+            device.unlockForConfiguration()
+            print("Auto focus enabled")
+            return true
+        } catch {
+            print("Error enabling auto focus: \(error)")
+            return false
+        }
+    }
+
+    /// Check if auto focus is currently enabled
+    /// - Returns: true if auto focus is enabled
+    public func isAutoFocus() -> Bool {
+        guard let device else { return false }
+        return device.focusMode == .continuousAutoFocus || device.focusMode == .autoFocus
+    }
+
+    /// Get current lens position
+    /// - Returns: Current lens position (0.0 to 1.0)
+    public func getLensPosition() -> Float {
+        guard let device else { return 0 }
+        return device.lensPosition
+    }
 }
+

@@ -9,13 +9,19 @@ import Foundation
 import CoreMedia
 
 public protocol MetalInterface {
-    
+
     func setOrientation(orientation: Int)
-    
+
+    /// Lock orientation to prevent processing device orientation changes
+    func lockOrientation()
+
+    /// Unlock orientation to allow processing device orientation changes
+    func unlockOrientation()
+
     func muteVideo()
-    
+
     func unMuteVideo()
-    
+
     func isVideoMuted() -> Bool
     
     func setEncoderSize(width: Int, height: Int)

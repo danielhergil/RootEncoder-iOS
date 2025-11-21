@@ -10,9 +10,12 @@ import MetalKit
 
 
 public class SizeCalculator {
-    
+
+    // CRITICAL FIX: Cache last stable orientation to avoid reading unstable device orientation during render
+    private static var lastStableOrientation: UIDeviceOrientation = .landscapeLeft
+
     public init() { }
-    
+
     public static func processMatrix(initialOrientation: Int) -> CGImagePropertyOrientation {
         switch initialOrientation {
         case 90:
@@ -27,11 +30,49 @@ public class SizeCalculator {
             return SizeCalculator.processMatrix(initialOrientation: UIDeviceOrientation.landscapeLeft)
         }
     }
-    
+
+    /// Get stable device orientation, filtering out unstable states like faceUp, faceDown, unknown
+    private static func getStableOrientation() -> UIDeviceOrientation {
+        let currentOrientation = UIDevice.current.orientation
+
+        // CRITICAL FIX: Filter out unstable orientations
+        // When phone is pointed down (faceDown) or up (faceUp), iOS orientation becomes unstable
+        // This causes rapid switching between orientations, creating blinking/split screen effect
+        switch currentOrientation {
+        case .faceUp, .faceDown, .unknown:
+            // Return last known stable orientation instead of current unstable one
+            return lastStableOrientation
+        case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
+            // Valid stable orientation - cache it for future use
+            lastStableOrientation = currentOrientation
+            return currentOrientation
+        @unknown default:
+            return lastStableOrientation
+        }
+    }
+
+    /// Reset cached orientation (useful when app starts or orientation lock changes)
+    public static func resetCachedOrientation() {
+        lastStableOrientation = .landscapeLeft
+    }
+
+    /// Force a specific stable orientation (useful for orientation locking)
+    public static func forceOrientation(_ orientation: UIDeviceOrientation) {
+        switch orientation {
+        case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
+            lastStableOrientation = orientation
+        default:
+            break
+        }
+    }
+
     public static func processMatrix(initialOrientation: UIDeviceOrientation) -> CGImagePropertyOrientation {
+        // CRITICAL FIX: Use stable orientation instead of directly reading UIDevice.current.orientation
+        let deviceOrientation = getStableOrientation()
+
         switch initialOrientation {
         case .landscapeRight:
-            switch UIDevice.current.orientation {
+            switch deviceOrientation {
             case .landscapeLeft:
                 return .up
             case .landscapeRight:
@@ -44,7 +85,7 @@ public class SizeCalculator {
                 return .up
             }
         case .landscapeLeft:
-            switch UIDevice.current.orientation {
+            switch deviceOrientation {
             case .landscapeLeft:
                 return .down
             case .landscapeRight:
@@ -57,7 +98,7 @@ public class SizeCalculator {
                 return .up
             }
         case .portrait:
-            switch UIDevice.current.orientation {
+            switch deviceOrientation {
             case .landscapeLeft:
                 return .left
             case .landscapeRight:
@@ -70,7 +111,7 @@ public class SizeCalculator {
                 return .up
             }
         case .portraitUpsideDown:
-            switch UIDevice.current.orientation {
+            switch deviceOrientation {
             case .landscapeLeft:
                 return .right
             case .landscapeRight:

@@ -17,6 +17,24 @@ public class MetalView: MTKView, MetalInterface {
     
     public func setOrientation(orientation: Int) {
         rotation = orientation
+        // Update cached orientation when rotation is set
+        // This will be recalculated before locking
+        cachedOrientation = SizeCalculator.processMatrix(initialOrientation: orientation)
+    }
+
+    /// Lock orientation to prevent processing device orientation changes
+    /// This should be called AFTER the UI has settled in the desired orientation
+    public func lockOrientation() {
+        // CRITICAL FIX: Recalculate orientation NOW with current UI state before locking
+        // This ensures we cache the correct landscape orientation
+        cachedOrientation = SizeCalculator.processMatrix(initialOrientation: rotation)
+        isOrientationLocked = true
+        print("MetalView: Locked orientation at \(cachedOrientation)")
+    }
+
+    /// Unlock orientation to allow processing device orientation changes
+    public func unlockOrientation() {
+        isOrientationLocked = false
     }
     
     public func muteVideo() {
@@ -104,6 +122,8 @@ public class MetalView: MTKView, MetalInterface {
     private var width: CGFloat = 640
     private var height: CGFloat = 480
     private var rotation = 0
+    private var isOrientationLocked = false // CRITICAL FIX: Track if orientation is locked
+    private var cachedOrientation: CGImagePropertyOrientation = .up // CRITICAL FIX: Cache orientation
     private lazy var render: (any MTLCommandQueue)? = {
         return device?.makeCommandQueue()
     }()
@@ -175,8 +195,18 @@ extension MetalView: MTKViewDelegate {
             .cropToAspectRatio(aspectRatio: self.width / self.height)
             .scaleTo(width: self.width, height: self.height)
 
-        let orientation: CGImagePropertyOrientation = SizeCalculator.processMatrix(initialOrientation: rotation)
-        
+        // CRITICAL FIX: Use cached orientation if locked, otherwise calculate dynamically
+        let orientation: CGImagePropertyOrientation
+        if isOrientationLocked {
+            // Use cached orientation - prevents blinking when device rotates
+            orientation = cachedOrientation
+        } else {
+            // Calculate orientation dynamically from device orientation
+            orientation = SizeCalculator.processMatrix(initialOrientation: rotation)
+            // Cache for next frame
+            cachedOrientation = orientation
+        }
+
         //apply filters
         for filter in filters {
             streamImage = filter.draw(image: streamImage, orientation: orientation)
